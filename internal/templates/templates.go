@@ -16,13 +16,21 @@ type FeatureData struct {
 	Title string // 見出しに使う表示名 (例: User Login)
 }
 
+// ScreenData holds the values substituted into the screen template.
+type ScreenData struct {
+	Feature string // 所属する feature 名
+	Num     string // 画面番号 (例: S-001)
+	Title   string // 見出しに使う表示名
+	Order   int    // 並び順
+}
+
 // Static returns the raw bytes of an embedded static template (init で生成するファイル).
 func Static(name string) ([]byte, error) {
 	return files.ReadFile("files/" + name)
 }
 
-// RenderFeature renders a feature template (spec.md.tmpl / api.md.tmpl) with data.
-func RenderFeature(name string, data FeatureData) ([]byte, error) {
+// Render renders the named template with arbitrary data.
+func Render(name string, data any) ([]byte, error) {
 	raw, err := files.ReadFile("files/" + name)
 	if err != nil {
 		return nil, err

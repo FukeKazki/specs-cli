@@ -17,8 +17,14 @@ type initScaffold struct {
 var initFiles = []initScaffold{
 	{path: "product/vision.md", template: "vision.md"},
 	{path: "product/principles.md", template: "principles.md"},
-	{path: "domain/glossary.md", template: "glossary.md"},
-	{path: "domain/models.md", template: "models.md"},
+}
+
+// ユビキタス言語 (term) とモデル (model) は 1 件 1 ファイルで管理するため、
+// init では空ディレクトリのみ用意する (実体は new term / new model で生成)。
+var initDirs = []string{
+	"features",
+	"domain/glossary",
+	"domain/models",
 }
 
 // runInit creates the specs/ directory tree with template files.
@@ -44,12 +50,13 @@ func runInit(args []string) error {
 		fmt.Printf("created %s\n", dst)
 	}
 
-	// features/ は空ディレクトリとして用意する。
-	featuresDir := filepath.Join(root, "features")
-	if err := os.MkdirAll(featuresDir, 0o755); err != nil {
-		return err
+	for _, d := range initDirs {
+		dst := filepath.Join(root, d)
+		if err := os.MkdirAll(dst, 0o755); err != nil {
+			return err
+		}
+		fmt.Printf("created %s/\n", dst)
 	}
-	fmt.Printf("created %s/\n", featuresDir)
 
 	return nil
 }

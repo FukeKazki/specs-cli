@@ -2,30 +2,45 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/kazki/specs-cli/internal/templates"
+	"github.com/kazki/specs-cli/internal/store"
 )
-
-// featureFiles maps a generated filename to its embedded template.
-var featureFiles = map[string]string{
-	"spec.md": "spec.md.tmpl",
-	"api.md":  "api.md.tmpl",
-}
 
 // runNew dispatches `specs new <subtype> ...`.
 func runNew(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: specs new feature <name>")
+		return fmt.Errorf("usage: specs new feature <name> | specs new screen <feature> <name>")
 	}
 	switch args[0] {
 	case "feature":
 		return runNewFeature(args[1:])
+	case "screen":
+		return runNewScreen(args[1:])
+	case "term":
+		return runNewDomain(args[1:], "term", func(st *store.Store, name string) (string, error) { return st.CreateTerm(name) })
+	case "model":
+		return runNewDomain(args[1:], "model", func(st *store.Store, name string) (string, error) { return st.CreateModel(name) })
 	default:
-		return fmt.Errorf("unknown new target %q (supported: feature)", args[0])
+		return fmt.Errorf("unknown new target %q (supported: feature, screen, term, model)", args[0])
 	}
+}
+
+// runNewDomain creates a domain entry (term / model).
+func runNewDomain(args []string, kind string, create func(*store.Store, string) (string, error)) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: specs new %s <name>", kind)
+	}
+	st := store.New(".")
+	if err := st.EnsureInitialized(); err != nil {
+		return err
+	}
+	id, err := create(st, args[0])
+	if err != nil {
+		return err
+	}
+	fmt.Printf("created %s\n", filepath.Join(store.Root, filepath.FromSlash(id)))
+	return nil
 }
 
 // runNewFeature creates specs/features/<name>/{spec.md,api.md}.
@@ -33,48 +48,33 @@ func runNewFeature(args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("usage: specs new feature <name>")
 	}
-	name := args[0]
-
-	root := "specs"
-	if _, err := os.Stat(root); err != nil {
-		return fmt.Errorf("%s/ が見つかりません。先に `specs init` を実行してください", root)
+	st := store.New(".")
+	if err := st.EnsureInitialized(); err != nil {
+		return err
 	}
-
-	dir := filepath.Join(root, "features", name)
-	if _, err := os.Stat(dir); err == nil {
-		return fmt.Errorf("%s は既に存在します", dir)
+	created, err := st.CreateFeature(args[0])
+	if err != nil {
+		return err
 	}
-
-	data := templates.FeatureData{
-		Name:  name,
-		Title: titleize(name),
+	for _, id := range created {
+		fmt.Printf("created %s\n", filepath.Join(store.Root, filepath.FromSlash(id)))
 	}
-
-	for filename, tmpl := range featureFiles {
-		content, err := templates.RenderFeature(tmpl, data)
-		if err != nil {
-			return err
-		}
-		dst := filepath.Join(dir, filename)
-		if err := writeFile(dst, content); err != nil {
-			return err
-		}
-		fmt.Printf("created %s\n", dst)
-	}
-
 	return nil
 }
 
-// titleize turns "user-login" / "user_login" into "User Login" for headings.
-func titleize(name string) string {
-	fields := strings.FieldsFunc(name, func(r rune) bool {
-		return r == '-' || r == '_' || r == ' '
-	})
-	for i, w := range fields {
-		if w == "" {
-			continue
-		}
-		fields[i] = strings.ToUpper(w[:1]) + w[1:]
+// runNewScreen creates specs/features/<feature>/screens/S-00n-<name>.md.
+func runNewScreen(args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("usage: specs new screen <feature> <name>")
 	}
-	return strings.Join(fields, " ")
+	st := store.New(".")
+	if err := st.EnsureInitialized(); err != nil {
+		return err
+	}
+	id, err := st.CreateScreen(args[0], args[1])
+	if err != nil {
+		return err
+	}
+	fmt.Printf("created %s\n", filepath.Join(store.Root, filepath.FromSlash(id)))
+	return nil
 }

@@ -7,7 +7,7 @@ import (
 	"text/template"
 )
 
-//go:embed files/*.md files/*.md.tmpl
+//go:embed files/*.md files/*.md.tmpl files/*.yaml.tmpl
 var files embed.FS
 
 // FeatureData holds the values substituted into feature templates.

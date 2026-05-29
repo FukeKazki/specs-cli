@@ -9,7 +9,7 @@ status: draft
 ## Description
 
 機能 (`features/<name>/`) を表すアグリゲート。
-1 つの feature 仕様 (`spec.md`, type=feature)、1 つの API 仕様 (`api.md`, type=api)、
+1 つの feature 仕様 (`spec.md`, type=feature)、1 つの API 仕様 (`api.yaml`, type=api)、
 複数の画面 ([Screen](Screen.md), `screens/`) を束ねる。
 
 - `name`: feature 名（ディレクトリ名。英数字 `.` `_` `-`）
@@ -35,6 +35,6 @@ classDiagram
     }
 
     Feature "1" o-- "1" Spec : spec.md (feature)
-    Feature "1" o-- "1" Spec : api.md (api)
+    Feature "1" o-- "1" Spec : api.yaml (api)
     Feature "1" o-- "*" Screen : screens
 ```

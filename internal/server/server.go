@@ -152,9 +152,12 @@ func writeErr(w http.ResponseWriter, code int, err error) {
 }
 
 func writeStoreErr(w http.ResponseWriter, err error) {
+	var valErr *store.ValidationError
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		writeErr(w, http.StatusNotFound, err)
+	case errors.As(err, &valErr):
+		writeErr(w, http.StatusBadRequest, err)
 	case strings.Contains(err.Error(), "invalid"):
 		writeErr(w, http.StatusBadRequest, err)
 	default:

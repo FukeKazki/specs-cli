@@ -102,6 +102,32 @@ textarea {
 .mermaid-error strong { color: var(--danger); display: block; margin-bottom: 6px; }
 .mermaid-error pre { background: var(--code); padding: 8px; border-radius: 6px; overflow-x: auto; font-size: 12px; }
 
+/* OpenAPI 軽量ビュー */
+.openapi h1 { font-size: 22px; margin-bottom: 4px; }
+.openapi h2 { font-size: 16px; margin-top: 26px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.oas-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.oas-desc { color: var(--muted); white-space: pre-wrap; }
+.oas-servers { color: var(--muted); font-size: 13px; }
+.oas-path { border: 1px solid var(--border); border-radius: 10px; margin: 10px 0; overflow: hidden; }
+.oas-pathname { display: block; background: var(--code); padding: 8px 12px; font-weight: 600; }
+.oas-op { display: flex; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--border); }
+.oas-method {
+  flex: 0 0 auto; align-self: flex-start; font-size: 11px; font-weight: 700; color: #fff;
+  padding: 2px 8px; border-radius: 6px; min-width: 54px; text-align: center;
+}
+.method-get { background: #3a6df0; }
+.method-post { background: #2e9e5b; }
+.method-put { background: #c2810f; }
+.method-patch { background: #7a51d6; }
+.method-delete { background: var(--danger); }
+.method-head, .method-options, .method-trace { background: var(--muted); }
+.oas-op-body { flex: 1; }
+.oas-summary { font-weight: 500; }
+.oas-params, .oas-responses { color: var(--muted); font-size: 12px; margin-top: 3px; }
+.oas-resp { display: inline-block; margin-right: 10px; }
+.oas-schemas { padding-left: 20px; }
+.oas-schemas code { background: var(--code); padding: 2px 6px; border-radius: 4px; }
+
 .toast {
   position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
   background: #2b2b2a; color: #fff; padding: 9px 16px; border-radius: 8px;

@@ -20,6 +20,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/kazki/specs-cli/internal/openapi"
 	"github.com/kazki/specs-cli/internal/templates"
 )
 
@@ -28,6 +29,17 @@ const Root = "specs"
 
 // ErrNotFound は対象の仕様書が存在しないときに返す。
 var ErrNotFound = errors.New("spec not found")
+
+// ValidationError は保存内容の検証 (OpenAPI スキーマ等) に失敗したことを表す。
+type ValidationError struct{ err error }
+
+func (e *ValidationError) Error() string { return e.err.Error() }
+func (e *ValidationError) Unwrap() error { return e.err }
+
+// isSpecFile は管理対象の仕様書ファイルか判定する (.md / .yaml)。
+func isSpecFile(name string) bool {
+	return strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".yaml")
+}
 
 // Spec は 1 つの仕様書ファイルを表す (domain model: Spec)。
 type Spec struct {
@@ -77,7 +89,7 @@ func (s *Store) List() ([]Spec, error) {
 				}
 				return err
 			}
-			if d.IsDir() || !strings.HasSuffix(d.Name(), ".md") {
+			if d.IsDir() || !isSpecFile(d.Name()) {
 				return nil
 			}
 			rel, err := filepath.Rel(filepath.Join(s.dir, Root), path)
@@ -120,12 +132,18 @@ func (s *Store) Get(id string) (Spec, string, error) {
 }
 
 // Update は既存仕様書の本文を上書きする。
+// api.yaml は保存前に OpenAPI スキーマ検証を行い、不正なら ValidationError を返す。
 func (s *Store) Update(id, content string) error {
 	if err := validateID(id); err != nil {
 		return err
 	}
 	if !s.exists(id) {
 		return ErrNotFound
+	}
+	if strings.HasSuffix(id, ".yaml") {
+		if err := openapi.Validate([]byte(content)); err != nil {
+			return &ValidationError{err: err}
+		}
 	}
 	return os.WriteFile(s.abs(id), []byte(content), 0o644)
 }
@@ -186,7 +204,7 @@ func (s *Store) CreateFeature(name string) ([]string, error) {
 	}
 
 	data := templates.FeatureData{Name: name, Title: titleize(name)}
-	templateFiles := map[string]string{"spec.md": "spec.md.tmpl", "api.md": "api.md.tmpl"}
+	templateFiles := map[string]string{"spec.md": "spec.md.tmpl", "api.yaml": "api.yaml.tmpl"}
 
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
@@ -357,8 +375,12 @@ func (s *Store) screensOf(feature string) ([]Spec, error) {
 	return out, nil
 }
 
-// read はファイルの frontmatter と H1 から Spec メタを構築する。
+// read はファイルから Spec メタを構築する。
+// Markdown は frontmatter と H1 から、OpenAPI (.yaml) は info.title から取得する。
 func (s *Store) read(id string) (Spec, error) {
+	if strings.HasSuffix(id, ".yaml") {
+		return s.readOpenAPI(id)
+	}
 	sp := Spec{ID: id, Feature: featureOf(id), File: filepath.Base(id)}
 	f, err := os.Open(s.abs(id))
 	if err != nil {
@@ -405,6 +427,21 @@ func (s *Store) read(id string) (Spec, error) {
 		return sp, err
 	}
 	if sp.Title == "" {
+		sp.Title = sp.File
+	}
+	return sp, nil
+}
+
+// readOpenAPI は api.yaml のメタを構築する (type=api, title=info.title)。
+func (s *Store) readOpenAPI(id string) (Spec, error) {
+	sp := Spec{ID: id, Feature: featureOf(id), File: filepath.Base(id), Type: "api"}
+	data, err := os.ReadFile(s.abs(id))
+	if err != nil {
+		return sp, err
+	}
+	if t := openapi.Title(data); t != "" {
+		sp.Title = t
+	} else {
 		sp.Title = sp.File
 	}
 	return sp, nil
@@ -477,19 +514,15 @@ func groupKey(s Spec) string {
 	return s.Feature
 }
 
-// rank はグループ内の表示順を決める。
-// domain: term → model。feature: spec.md → api.md → screen → その他。
+// rank はグループ内の表示順を type で決める。
+// domain: term → model。feature: feature(spec.md) → api(api.yaml) → screen → その他。
 func rank(s Spec) int {
-	switch {
-	case s.Type == "term":
+	switch s.Type {
+	case "term", "feature":
 		return 0
-	case s.Type == "model":
+	case "model", "api":
 		return 1
-	case s.File == "spec.md":
-		return 0
-	case s.File == "api.md":
-		return 1
-	case s.Type == "screen":
+	case "screen":
 		return 2
 	default:
 		return 3
@@ -538,7 +571,7 @@ func validateID(id string) error {
 	if clean != id || strings.HasPrefix(clean, "/") || strings.Contains(clean, "..") {
 		return errors.New("invalid id")
 	}
-	if !strings.HasSuffix(clean, ".md") {
+	if !isSpecFile(clean) {
 		return errors.New("invalid id")
 	}
 	for _, dir := range managedDirs {

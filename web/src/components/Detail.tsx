@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { SpecDetail } from "../types";
 import { Markdown } from "./Markdown";
+import { OpenApiView } from "./OpenApiView";
 
 export interface DetailProps {
   id: string;
@@ -99,7 +100,7 @@ export function Detail({ id, onSaved, onDeleted, onError, onToast }: DetailProps
               削除
             </button>
           </div>
-          <Markdown content={content} />
+          {spec.type === "api" ? <OpenApiView content={content} /> : <Markdown content={content} />}
         </>
       )}
     </>

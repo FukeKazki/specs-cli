@@ -35,7 +35,7 @@ related:
 ### Excluded
 
 - 認証・認可（ローカル実行のため不要）
-- 仕様書本体（spec.md / api.md）の任意単体追加（作成はfeature単位）
+- 仕様書本体（spec.md / api.yaml）の任意単体追加（作成はfeature単位）
 - WYSIWYGエディタ（編集はMarkdownテキストで行う）
 - DBによる管理（Markdownファイルを唯一の正とする）
 
@@ -43,8 +43,14 @@ related:
 
 ### R-001 仕様書の対象範囲
 
-仕様書として扱うのは `specs/features/<feature>/*.md` のみとする。
-product / domain 配下のファイルは対象外とする。
+仕様書として扱うのは以下とする。
+
+- `features/<feature>/spec.md`（type: feature）
+- `features/<feature>/api.yaml`（type: api / OpenAPI 3.1）
+- `features/<feature>/screens/*.md`（type: screen）
+- `domain/glossary/*.md`（type: term）, `domain/models/*.md`（type: model）
+
+product 配下のファイルは対象外とする。
 
 ### R-002 ローカルWeb UIの起動
 
@@ -59,17 +65,21 @@ specs/ が未初期化の場合はエラーを表示し、`specs init` を促す
 
 ### R-004 詳細の表示
 
-選択した仕様書をMarkdownとして整形表示する。
-frontmatter はメタ情報として区別して表示する。
+仕様書を種別に応じて整形表示する。
+
+- Markdown（spec.md / screen / term）: frontmatter をメタ情報として区別し本文を描画
+- model: mermaid コードブロックを図として描画
+- api.yaml: OpenAPI として paths / operations / schemas を軽量ビューで表示
 
 ### R-005 更新
 
-詳細画面で編集モードに切り替え、本文を上書き保存できる。
-保存後は一覧のメタ情報（title / status）も更新される。
+詳細画面で編集モードに切り替え、本文（Markdown / YAML テキスト）を上書き保存できる。
+api.yaml は保存前に **OpenAPI スキーマ検証**を行い、不正な場合はエラーを表示して保存しない。
+保存後は一覧のメタ情報（title など）も更新される。
 
 ### R-006 新規作成
 
-- feature 作成: feature 名を入力すると `spec.md` / `api.md` を生成する。
+- feature 作成: feature 名を入力すると `spec.md` / `api.yaml`（OpenAPI 3.1 雛形）を生成する。
   CLI の `specs new feature <name>` と同一の生成ロジック・テンプレートを用いる。
   feature 名に使えるのは英数字・`.`・`_`・`-` のみ。
 - 画面作成: feature を指定して画面を追加すると `screens/S-00n[-<slug>].md`
@@ -85,7 +95,7 @@ frontmatter はメタ情報として区別して表示する。
 
 一覧上のドラッグ&ドロップで同一 feature 内の画面の表示順を変更できる。
 並び順は各画面ファイルの frontmatter の `order` に永続化する。
-一覧は feature 昇順 → feature 内は spec.md, api.md, その後 screen を
+一覧は domain → feature 昇順 → feature 内は spec.md, api.yaml, その後 screen を
 order 昇順で表示する。
 
 ### R-009 安全性

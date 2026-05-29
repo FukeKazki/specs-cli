@@ -1,0 +1,31 @@
+openapi: 3.1.0
+info:
+  title: {{.Title}} API
+  version: 0.1.0
+  description: |
+    {{.Title}} の API 仕様。
+servers:
+  - url: /api
+paths:
+  /{{.Name}}:
+    get:
+      summary: 一覧取得
+      operationId: list_{{.Name}}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/{{.Name}}"
+components:
+  schemas:
+    {{.Name}}:
+      type: object
+      properties:
+        id:
+          type: string
+      required:
+        - id

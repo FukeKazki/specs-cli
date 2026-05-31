@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/kazki/specs-cli/internal/cmd"
+	"github.com/FukeKazki/specs-cli/internal/cmd"
 )
 
 func main() {

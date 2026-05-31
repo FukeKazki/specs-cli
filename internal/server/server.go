@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/kazki/specs-cli/internal/store"
+	"github.com/FukeKazki/specs-cli/internal/store"
 )
 
 // dist は Vite (web/) のビルド成果物。`cd web && npm run build` で生成される。

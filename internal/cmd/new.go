@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/kazki/specs-cli/internal/store"
+	"github.com/FukeKazki/specs-cli/internal/store"
 )
 
 // runNew dispatches `specs new <subtype> ...`.

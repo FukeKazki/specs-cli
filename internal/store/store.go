@@ -20,8 +20,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/kazki/specs-cli/internal/openapi"
-	"github.com/kazki/specs-cli/internal/templates"
+	"github.com/FukeKazki/specs-cli/internal/openapi"
+	"github.com/FukeKazki/specs-cli/internal/templates"
 )
 
 // Root は specs ディレクトリ。

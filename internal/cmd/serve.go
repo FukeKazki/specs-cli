@@ -6,8 +6,8 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/kazki/specs-cli/internal/server"
-	"github.com/kazki/specs-cli/internal/store"
+	"github.com/FukeKazki/specs-cli/internal/server"
+	"github.com/FukeKazki/specs-cli/internal/store"
 )
 
 // runServe starts the local Web UI for managing specs.

@@ -1,7 +1,5 @@
 /bin/
 .obsidian/
 
-# Vite ビルド成果物 (go:embed 対象)。`make build` で生成する。
-# .gitkeep だけ残し、//go:embed all:dist がコンパイルできるようにする。
-/internal/server/dist/*
-!/internal/server/dist/.gitkeep
+# Vite ビルド成果物 (//go:embed all:dist の対象)。`make build` で生成する。
+# go install で Web UI も埋め込めるよう dist は追跡対象に含める。

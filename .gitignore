@@ -1,4 +1,5 @@
 /bin/
+.obsidian/
 
 # Vite ビルド成果物 (go:embed 対象)。`make build` で生成する。
 # .gitkeep だけ残し、//go:embed all:dist がコンパイルできるようにする。

@@ -1,156 +1,311 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Spec } from "../types";
+import { Badge, Icon } from "./ui";
 
-interface Group {
-  feature: string;
-  docs: Spec[];
-  screens: Spec[];
-}
-
-function groupByFeature(specs: Spec[]): Group[] {
-  const groups: Group[] = [];
-  const byFeature = new Map<string, Group>();
-  for (const s of specs) {
-    let g = byFeature.get(s.feature);
-    if (!g) {
-      g = { feature: s.feature, docs: [], screens: [] };
-      byFeature.set(s.feature, g);
-      groups.push(g);
-    }
-    (s.type === "screen" ? g.screens : g.docs).push(s);
-  }
-  return groups;
-}
+const IND = 13; // px per nesting level
 
 export interface SidebarProps {
   specs: Spec[];
   activeId: string;
+  open: boolean;
   onSelect: (id: string) => void;
+  onAddFeature: () => void;
   onAddScreen: (feature: string) => void;
-  onReorderScreens: (feature: string, orderedIds: string[]) => void;
   onAddTerm: () => void;
   onAddModel: () => void;
+  onReorderScreens: (feature: string, orderedIds: string[]) => void;
 }
 
+function isProduct(s: Spec): boolean {
+  return s.id.startsWith("product/");
+}
 function isDomain(s: Spec): boolean {
   return s.id.startsWith("domain/");
+}
+// Product ドキュメントは vision を先頭に、以降はファイル名昇順。
+function sortProduct(a: Spec, b: Spec): number {
+  const rank = (s: Spec) => (s.file === "vision.md" ? 0 : 1);
+  return rank(a) - rank(b) || a.file.localeCompare(b.file);
+}
+function screenNumber(s: Spec): string {
+  const m = s.file.match(/^(S-\d+)/);
+  return m ? m[1] : s.file.replace(/\.md$/, "");
+}
+
+function Disclosure({
+  label,
+  open,
+  onToggle,
+  depth = 0,
+  onAdd,
+  addTitle,
+  group,
+  feature,
+  mono,
+  icon,
+  children,
+}: {
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+  depth?: number;
+  onAdd?: () => void;
+  addTitle?: string;
+  group?: boolean;
+  feature?: boolean;
+  mono?: boolean;
+  icon?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={"disc" + (group ? " disc-group" : "") + (feature ? " disc-feature" : "")}>
+      <div
+        className={"disc-head" + (open ? "" : " collapsed")}
+        style={{ paddingLeft: 8 + depth * IND }}
+        onClick={onToggle}
+      >
+        <span className="caret">
+          <Icon name="caret" size={13} />
+        </span>
+        {icon && <Icon name={icon} size={14} className="dico" />}
+        <span
+          className="disc-label"
+          style={mono ? { fontFamily: '"IBM Plex Mono", monospace', fontSize: 12 } : undefined}
+        >
+          {label}
+        </span>
+        {onAdd && (
+          <button
+            className="add"
+            title={addTitle}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd();
+            }}
+          >
+            <Icon name="plus" size={14} stroke={2} />
+          </button>
+        )}
+      </div>
+      {open && <div className="disc-body">{children}</div>}
+    </div>
+  );
 }
 
 export function Sidebar({
   specs,
   activeId,
+  open,
   onSelect,
+  onAddFeature,
   onAddScreen,
-  onReorderScreens,
   onAddTerm,
   onAddModel,
+  onReorderScreens,
 }: SidebarProps) {
-  const [dragId, setDragId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [drag, setDrag] = useState<{ id: string | null; over: string | null }>({ id: null, over: null });
 
+  const isOpen = (k: string) => !collapsed[k];
+  const toggle = (k: string) => setCollapsed((c) => ({ ...c, [k]: !c[k] }));
+
+  const products = specs.filter(isProduct).sort(sortProduct);
   const terms = specs.filter((s) => s.type === "term");
   const models = specs.filter((s) => s.type === "model");
-  const groups = groupByFeature(specs.filter((s) => !isDomain(s)));
+  const features = Array.from(
+    new Set(specs.filter((s) => !isDomain(s) && !isProduct(s) && s.feature).map((s) => s.feature)),
+  ).sort((a, b) => a.localeCompare(b));
 
-  const entry = (s: Spec, label: string) => (
-    <li
-      key={s.id}
-      className={`spec-item${s.id === activeId ? " active" : ""}`}
-      onClick={() => onSelect(s.id)}
-    >
-      <span className="grip placeholder" />
-      <span className="label">{label}</span>
-      <span className="badge">{s.type}</span>
-    </li>
-  );
-
-  const handleDrop = (feature: string, targetId: string) => {
-    if (!dragId || dragId === targetId) return;
-    const screenIds = specs.filter((s) => s.feature === feature && s.type === "screen").map((s) => s.id);
-    const from = screenIds.indexOf(dragId);
-    const to = screenIds.indexOf(targetId);
+  const onDrop = (feature: string, overId: string) => {
+    const dragId = drag.id;
+    setDrag({ id: null, over: null });
+    if (!dragId || dragId === overId) return;
+    const ids = specs
+      .filter((s) => s.type === "screen" && s.feature === feature)
+      .sort((a, b) => a.order - b.order)
+      .map((s) => s.id);
+    const from = ids.indexOf(dragId);
+    const to = ids.indexOf(overId);
     if (from < 0 || to < 0) return;
-    screenIds.splice(from, 1);
-    screenIds.splice(to, 0, dragId);
-    onReorderScreens(feature, screenIds);
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    onReorderScreens(feature, ids);
   };
 
+  const Row = ({
+    s,
+    label,
+    fileHint,
+    depth,
+    draggable,
+    feature,
+  }: {
+    s: Spec;
+    label: string;
+    fileHint?: string;
+    depth: number;
+    draggable?: boolean;
+    feature?: string;
+  }) => (
+    <div
+      className={
+        "row" +
+        (s.id === activeId ? " active" : "") +
+        (drag.id === s.id ? " dragging" : "") +
+        (drag.over === s.id ? " dragover" : "")
+      }
+      style={{ paddingLeft: 9 + depth * IND }}
+      onClick={() => onSelect(s.id)}
+      draggable={draggable}
+      onDragStart={
+        draggable
+          ? (e) => {
+              setDrag({ id: s.id, over: null });
+              e.dataTransfer.effectAllowed = "move";
+            }
+          : undefined
+      }
+      onDragOver={
+        draggable
+          ? (e) => {
+              e.preventDefault();
+              if (drag.over !== s.id) setDrag((d) => ({ ...d, over: s.id }));
+            }
+          : undefined
+      }
+      onDrop={
+        draggable && feature
+          ? (e) => {
+              e.preventDefault();
+              onDrop(feature, s.id);
+            }
+          : undefined
+      }
+      onDragEnd={draggable ? () => setDrag({ id: null, over: null }) : undefined}
+    >
+      {draggable && (
+        <span className="grip">
+          <Icon name="grip" size={14} stroke={2} />
+        </span>
+      )}
+      <span className="rlabel">
+        {s.type === "screen" && <span className="rnum mono">{screenNumber(s)}</span>}
+        {label}
+        {fileHint && <span className="rfile mono">{fileHint}</span>}
+      </span>
+      <Badge type={s.type} />
+    </div>
+  );
+
   return (
-    <aside className="sidebar">
-      <div className="feature-group">
-        <p className="feature-name">Domain</p>
-
-        <div className="screens-head">
-          <span>Ubiquitous Language</span>
-          <button className="add-screen" title="用語を追加" onClick={onAddTerm}>
-            + 用語
-          </button>
+    <aside className={"sidebar scroll" + (open ? "" : " collapsed")}>
+      <div className="sb-search">
+        <div className="field">
+          <Icon name="search" size={15} />
+          <input placeholder="仕様書を検索…" onChange={() => {}} />
+          <span className="mono" style={{ fontSize: 11 }}>
+            /
+          </span>
         </div>
-        <ul className="spec-list">{terms.map((s) => entry(s, s.title))}</ul>
-
-        <div className="screens-head">
-          <span>Models</span>
-          <button className="add-screen" title="モデルを追加" onClick={onAddModel}>
-            + モデル
-          </button>
-        </div>
-        <ul className="spec-list">{models.map((s) => entry(s, s.title))}</ul>
       </div>
-
-      {groups.map((g) => (
-        <div className="feature-group" key={g.feature}>
-          <p className="feature-name">{g.feature}</p>
-
-          <ul className="spec-list">
-            {g.docs.map((s) => (
-              <li
-                key={s.id}
-                className={`spec-item${s.id === activeId ? " active" : ""}`}
-                onClick={() => onSelect(s.id)}
-              >
-                <span className="grip placeholder" />
-                <span className="label">{s.file}</span>
-                <span className="badge">{s.type || "?"}</span>
-              </li>
+      <nav className="sb-tree">
+        {/* プロダクト */}
+        {products.length > 0 && (
+          <Disclosure label="プロダクト" group depth={0} open={isOpen("g:product")} onToggle={() => toggle("g:product")}>
+            {products.map((s) => (
+              <Row key={s.id} s={s} label={s.title} depth={1} />
             ))}
-          </ul>
+          </Disclosure>
+        )}
 
-          <div className="screens-head">
-            <span>Screens</span>
-            <button className="add-screen" title="画面を追加" onClick={() => onAddScreen(g.feature)}>
-              + 画面
-            </button>
-          </div>
+        {/* ドメイン */}
+        <Disclosure label="ドメイン" group depth={0} open={isOpen("g:domain")} onToggle={() => toggle("g:domain")}>
+          <Disclosure
+            label="ユビキタス言語"
+            depth={1}
+            open={isOpen("sub:terms")}
+            onToggle={() => toggle("sub:terms")}
+            onAdd={onAddTerm}
+            addTitle="用語を追加"
+          >
+            {terms.length ? (
+              terms.map((s) => <Row key={s.id} s={s} label={s.title} depth={2} />)
+            ) : (
+              <div className="row empty-row" style={{ paddingLeft: 9 + 2 * IND }}>
+                用語がありません
+              </div>
+            )}
+          </Disclosure>
+          <Disclosure
+            label="モデル"
+            depth={1}
+            open={isOpen("sub:models")}
+            onToggle={() => toggle("sub:models")}
+            onAdd={onAddModel}
+            addTitle="モデルを追加"
+          >
+            {models.length ? (
+              models.map((s) => <Row key={s.id} s={s} label={s.title} depth={2} />)
+            ) : (
+              <div className="row empty-row" style={{ paddingLeft: 9 + 2 * IND }}>
+                モデルがありません
+              </div>
+            )}
+          </Disclosure>
+        </Disclosure>
 
-          <ul className="spec-list screens">
-            {g.screens.map((s) => (
-              <li
-                key={s.id}
-                className={`spec-item screen${s.id === activeId ? " active" : ""}${dragId === s.id ? " dragging" : ""}`}
-                draggable
-                onClick={() => onSelect(s.id)}
-                onDragStart={() => setDragId(s.id)}
-                onDragEnd={() => setDragId(null)}
-                onDragOver={(e) => {
-                  if (dragId && g.screens.some((x) => x.id === dragId)) {
-                    e.preventDefault();
-                    e.currentTarget.classList.add("drop-target");
-                  }
-                }}
-                onDragLeave={(e) => e.currentTarget.classList.remove("drop-target")}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.currentTarget.classList.remove("drop-target");
-                  handleDrop(g.feature, s.id);
-                }}
+        {/* 機能 */}
+        <Disclosure
+          label="機能"
+          group
+          depth={0}
+          open={isOpen("g:features")}
+          onToggle={() => toggle("g:features")}
+          onAdd={onAddFeature}
+          addTitle="新規 feature"
+        >
+          {features.map((f) => {
+            const spec = specs.find((s) => s.feature === f && s.type === "feature");
+            const api = specs.find((s) => s.feature === f && s.type === "api");
+            const screens = specs
+              .filter((s) => s.feature === f && s.type === "screen")
+              .sort((a, b) => a.order - b.order);
+            const fk = "feat:" + f;
+            return (
+              <Disclosure
+                key={f}
+                label={f}
+                mono
+                icon="cube"
+                feature
+                depth={1}
+                open={isOpen(fk)}
+                onToggle={() => toggle(fk)}
               >
-                <span className="grip">⠿</span>
-                <span className="label">{s.title.replace(/^Screen:\s*/, "")}</span>
-                <span className="badge">{s.type}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+                {spec && <Row s={spec} label="機能仕様" fileHint="spec.md" depth={2} />}
+                {api && <Row s={api} label="API 仕様" fileHint="api.yaml" depth={2} />}
+                <Disclosure
+                  label="画面"
+                  depth={2}
+                  open={isOpen("screens:" + f)}
+                  onToggle={() => toggle("screens:" + f)}
+                  onAdd={() => onAddScreen(f)}
+                  addTitle="画面を追加"
+                >
+                  {screens.length ? (
+                    screens.map((s) => (
+                      <Row key={s.id} s={s} label={s.title.replace(/^Screen:\s*/, "")} depth={3} draggable feature={f} />
+                    ))
+                  ) : (
+                    <div className="row empty-row" style={{ paddingLeft: 9 + 3 * IND }}>
+                      画面がありません
+                    </div>
+                  )}
+                </Disclosure>
+              </Disclosure>
+            );
+          })}
+        </Disclosure>
+      </nav>
     </aside>
   );
 }

@@ -71,10 +71,11 @@ func (s *Store) EnsureInitialized() error {
 }
 
 // managedDirs は管理対象の仕様書ルート (specs/ からの相対パス)。
+//   - product          : ビジョン / プリンシパル (vision.md / principles.md, type=product)
 //   - features         : feature 配下の spec.md / api.md / screens
 //   - domain/glossary  : ユビキタス言語 (term)
 //   - domain/models    : モデル (model)
-var managedDirs = []string{"features", "domain/glossary", "domain/models"}
+var managedDirs = []string{"product", "features", "domain/glossary", "domain/models"}
 
 // List は管理対象の全仕様書を返す。
 // 並びは domain → feature 名昇順、各グループ内は種別ランク → order → ファイル名。
@@ -506,12 +507,16 @@ func sortSpecs(specs []Spec) {
 	})
 }
 
-// groupKey は表示グループのキー。domain は空文字で feature より先に並ぶ。
+// groupKey は表示グループのキー。product → domain → feature 名昇順の順に並ぶ。
 func groupKey(s Spec) string {
-	if strings.HasPrefix(s.ID, "domain/") {
-		return ""
+	switch {
+	case strings.HasPrefix(s.ID, "product/"):
+		return "0"
+	case strings.HasPrefix(s.ID, "domain/"):
+		return "1"
+	default:
+		return "2" + s.Feature
 	}
-	return s.Feature
 }
 
 // rank はグループ内の表示順を type で決める。

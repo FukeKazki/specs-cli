@@ -3,7 +3,7 @@ export interface Spec {
   id: string;
   feature: string;
   file: string;
-  type: string; // "feature" | "api" | "screen"
+  type: string; // "product" | "feature" | "api" | "screen" | "term" | "model"
   title: string;
   status: string;
   order: number;

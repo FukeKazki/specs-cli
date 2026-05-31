@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>specs — 仕様管理ツール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="root"></div>
+
+<!-- ============================================================
+     Embedded spec content (the Markdown / YAML files are the
+     single source of truth — read via getRaw(id))
+     ============================================================ -->
+
+<script type="text/plain" id="spec:product/vision.md">
+---
+id: product.vision
+type: product
+status: draft
+---
+
+# Vision
+
+## Background
+
+AI時代の仕様書管理をアップデートしたい。
+
+## Purpose
+
+ローカルファーストな仕様書管理CLI。
+CLI経由での作成・更新が可能。
+Web Viewも。
+
+## Target Users
+
+エンジニア
+
+## Value Proposition
+
+仕様書がちらばったり、管理されていない状態にならない。
+
+## Non-goals
+
+<!-- 初期スコープから外すもの -->
+</script>
+
+<script type="text/plain" id="spec:product/principles.md">
+---
+id: product.principles
+type: product
+status: draft
+---
+
+# Product Principles
+
+## Principle 1
+
+シンプルなツールに
+</script>
+
+<script type="text/plain" id="spec:domain/glossary/仕様書.md">
+---
+id: domain.glossary.仕様書
+type: term
+status: draft
+---
+
+# 仕様書
+
+## Definition
+
+API仕様書とページ仕様書のこと
+
+## Notes
+
+<!-- 補足 -->
+
+## Related
+
+<!-- 関連する用語・Feature -->
+</script>
+
+<script type="text/plain" id="spec:domain/glossary/ページ仕様書.md">
+---
+id: domain.glossary.ページ仕様書
+type: term
+status: draft
+---
+
+# ページ仕様書
+
+## Definition
+
+画面の設計についての仕様書
+そのページで何ができるのか、どういうUIがあるのか、アクセス権限など
+
+## Notes
+
+<!-- 補足 -->
+
+## Related
+
+<!-- 関連する用語・Feature -->
+</script>
+
+<script type="text/plain" id="spec:domain/models/Spec.md">
+---
+id: domain.models.Spec
+type: model
+status: draft
+---
+
+# Spec
+
+## Description
+
+仕様書 (specs/ 配下の 1 つの Markdown ファイル) を表す基底モデル。実装の `store.Spec` に対応する。
+`type` によって役割が分かれ、`screen` などは Spec の特化として別モデルに切り出している。
+
+- `id`: specs/ からの相対パス。一意キー（例: `features/user-login/spec.md`）
+- `feature`: 所属する feature 名（domain エントリでは空）
+- `file`: ファイル名（spec.md / api.yaml / S-00n.md / 用語名.md など）
+- `type`: 種別。`feature` / `api` / `screen` / `term` / `model`
+- `title`: 先頭の H1 見出し
+- `status`: frontmatter の status（draft など）
+- `order`: 並び順（screen で使用）
+
+関連: [Feature](Feature.md)（spec.md / api.yaml / screens を束ねる）、[Screen](Screen.md)（type=screen の特化）。
+
+## Diagram
+
+```mermaid
+classDiagram
+    class Spec {
+        +string id
+        +string feature
+        +string file
+        +SpecType type
+        +string title
+        +string status
+        +int order
+    }
+
+    class SpecType {
+        <<enumeration>>
+        feature
+        api
+        screen
+        term
+        model
+    }
+
+    Spec --> SpecType : type
+```
+</script>
+
+<script type="text/plain" id="spec:domain/models/Feature.md">
+---
+id: domain.models.Feature
+type: model
+status: draft
+---
+
+# Feature
+
+## Description
+
+機能 (`features/<name>/`) を表すアグリゲート。
+1 つの feature 仕様 (`spec.md`, type=feature)、1 つの API 仕様 (`api.yaml`, type=api)、
+複数の画面 ([Screen](Screen.md), `screens/`) を束ねる。
+
+- `name`: feature 名（ディレクトリ名。英数字 `.` `_` `-`）
+
+構成要素はすべて [Spec](Spec.md)（の特化）として表現される。
+
+## Diagram
+
+```mermaid
+classDiagram
+    class Feature {
+        +string name
+    }
+
+    class Spec {
+        +string id
+        +SpecType type
+    }
+
+    class Screen {
+        +string id
+        +int order
+    }
+
+    Feature "1" o-- "1" Spec : spec.md (feature)
+    Feature "1" o-- "1" Spec : api.yaml (api)
+    Feature "1" o-- "*" Screen : screens
+```
+</script>
+
+<script type="text/plain" id="spec:domain/models/Screen.md">
+---
+id: domain.models.Screen
+type: model
+status: draft
+---
+
+# Screen
+
+## Description
+
+画面仕様 (`features/<feature>/screens/S-00n.md`, type=screen) を表すモデル。
+[Spec](Spec.md) の特化で、[Feature](Feature.md) に属する。
+
+- `id`: specs/ からの相対パス
+- `feature`: 所属する feature 名
+- `number`: 画面番号（ファイル名先頭の `S-00n`、追加時に自動採番）
+- `title`: 画面名（H1 見出し）
+- `order`: feature 内の並び順（frontmatter の order。ドラッグ&ドロップで更新）
+- `status`: frontmatter の status
+
+## Diagram
+
+```mermaid
+classDiagram
+    class Screen {
+        +string id
+        +string feature
+        +string number
+        +string title
+        +int order
+        +string status
+    }
+
+    class Feature {
+        +string name
+    }
+
+    Screen --|> Spec : type=screen
+    Feature "1" o-- "*" Screen : screens
+```
+</script>
+
+<script type="text/plain" id="spec:features/product/spec.md">
+---
+id: feature.product
+type: feature
+status: draft
+related:
+  - domain.glossary
+  - domain.models
+---
+
+# Feature: Product
+
+## Overview
+
+プロダクトのビジョンやプリンシパルを管理するページ
+
+## Users
+
+PM
+
+## Scope
+
+### Included
+
+- ビジョン (`product/vision.md`) の閲覧・編集
+- プリンシパル (`product/principles.md`) の閲覧・編集
+
+### Excluded
+
+- product ドキュメントの新規作成・削除（`specs init` が生成する 2 ファイルを編集するのみ）
+- 認証・認可（ローカル実行のため不要）
+
+## Requirements
+
+### R-001 管理対象
+
+product 配下の以下 2 ファイルを管理する。いずれも frontmatter `type: product` の Markdown。
+
+- `product/vision.md`: プロダクトのビジョン
+- `product/principles.md`: プロダクトのプリンシパル
+
+これらは `specs init` で雛形を生成する。
+
+### R-002 閲覧
+
+ローカル Web UI のサイドバー「Product」セクションに、ビジョンを先頭、続けて
+プリンシパルを表示する。項目を選択すると本文を Markdown として整形表示する。
+
+### R-003 編集
+
+詳細画面で編集モードに切り替え、本文（Markdown テキスト）を上書き保存できる。
+保存後は一覧のメタ情報（title）も更新される。
+
+### R-004 制約
+
+product ドキュメントの新規作成・削除は提供しない（詳細画面に削除ボタンを出さない）。
+ID（specs/ からの相対パス）はパストラバーサルを禁止し、`product/` 配下かつ
+`.md` で終わるパスのみを受け付ける。
+
+## Screens
+
+画面は `screens/` 配下に 1 画面 1 ファイル（type: screen）で管理する。
+
+- [S-001 ビジョン画面](screens/S-001.md)
+- [S-002 プリンシパル画面](screens/S-002.md)
+</script>
+
+<script type="text/plain" id="spec:features/product/api.yaml">
+openapi: 3.1.0
+info:
+  title: Product API
+  version: 0.1.0
+  description: |
+    Product の API 仕様。
+servers:
+  - url: /api
+paths:
+  /product:
+    get:
+      summary: 一覧取得
+      operationId: list_product
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/product"
+components:
+  schemas:
+    product:
+      type: object
+      properties:
+        id:
+          type: string
+      required:
+        - id
+</script>
+
+<script type="text/plain" id="spec:features/product/screens/S-001.md">
+---
+id: feature.product.screen.S-001
+type: screen
+feature: product
+order: 1
+status: draft
+---
+
+# Screen: ビジョン画面
+
+## Purpose
+
+`product/vision.md` の閲覧・編集ができる。
+
+## Fields
+
+- Background（なぜこのプロダクトが必要か）
+- Purpose（何を実現するか）
+- Target Users（誰のためのプロダクトか）
+- Value Proposition（どのような価値を提供するか）
+- Non-goals（初期スコープから外すもの）
+
+## Actions
+
+- 本文を Markdown として整形表示する
+- 「編集」で編集モードへ切り替える
+- 「保存」で本文を上書き保存する / 「キャンセル」で破棄する
+
+## Errors
+
+- 取得失敗時はトーストでメッセージを表示する
+- 保存失敗時はトーストを表示し編集モードを維持する
+</script>
+
+<script type="text/plain" id="spec:features/product/screens/S-002.md">
+---
+id: feature.product.screen.S-002
+type: screen
+feature: product
+order: 2
+status: draft
+---
+
+# Screen: プリンシパル画面
+
+## Purpose
+
+`product/principles.md` の閲覧・編集ができる。
+
+## Fields
+
+- Principle N（判断基準となる原則）
+
+## Actions
+
+- 本文を Markdown として整形表示する
+- 「編集」で編集モードへ切り替える
+- 「保存」で本文を上書き保存する / 「キャンセル」で破棄する
+
+## Errors
+
+- 取得失敗時はトーストでメッセージを表示する
+- 保存失敗時はトーストを表示し編集モードを維持する
+</script>
+
+<script type="text/plain" id="spec:features/domain-management/spec.md">
+---
+id: feature.domain-management
+type: feature
+status: draft
+related:
+  - domain.glossary
+  - domain.models
+---
+
+# Feature: Domain Management
+
+## Overview
+
+ドメインを管理する
+
+## Users
+
+PM、エンジニア
+
+## Scope
+
+### Included
+
+- ユビキタス言語の管理
+- モデルの管理
+
+### Excluded
+
+-
+
+## Requirements
+
+### R-001 モデルの表示
+
+モデルはmermaidの記法で書く。表示もmermaidのpreviewで表示されるようにする。
+
+### R-002 データ構造
+
+ユビキタス言語は `domain/glossary/<term>.md` (type: term)、
+モデルは `domain/models/<model>.md` (type: model) として 1 件 1 ファイルで管理する。
+名前に日本語を許可し、パス区切り (`/` `\`) や `.` 始まりの名前は禁止する。
+
+### R-003 ユビキタス言語の管理
+
+一覧・詳細・追加・編集・削除ができる。
+追加は CLI `specs new term <name>`、または Web UI の「+ 用語」から。
+
+### R-004 モデルの管理
+
+一覧・詳細・追加・編集・削除ができる。
+追加は CLI `specs new model <name>`、または Web UI の「+ モデル」から。
+モデルファイルは説明 + mermaid コードブロックを持ち、詳細画面で mermaid を描画する。
+
+## Screens
+
+画面は `screens/` 配下に 1 画面 1 ファイル（type: screen）で管理する。
+
+- [S-001 ユビキタス言語一覧画面](screens/S-001.md)
+- [S-002 モデル一覧画面](screens/S-002.md)
+</script>
+
+<script type="text/plain" id="spec:features/domain-management/api.yaml">
+openapi: 3.1.0
+info:
+  title: Domain Management API
+  version: 0.1.0
+  description: |
+    ドメイン (ユビキタス言語・モデル) を管理する API。
+    一覧・詳細・更新・削除は Specs Management API の /specs を利用する
+    (domain エントリの id は domain/glossary/<term>.md / domain/models/<model>.md)。
+    本仕様では domain 固有の作成エンドポイントを定義する。
+servers:
+  - url: /api
+paths:
+  /domain/terms:
+    post:
+      summary: ユビキタス言語の作成
+      operationId: createTerm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          $ref: "#/components/responses/Error"
+  /domain/models:
+    post:
+      summary: モデルの作成 (mermaid テンプレート)
+      operationId: createModel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          $ref: "#/components/responses/Error"
+components:
+  responses:
+    Created:
+      description: Created
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              created:
+                type: string
+            required:
+              - created
+    Error:
+      description: エラー
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+            required:
+              - error
+  schemas:
+    CreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+        - name
+</script>
+
+<script type="text/plain" id="spec:features/domain-management/screens/S-001.md">
+---
+id: feature.domain-management.screen.S-001
+type: screen
+feature: domain-management
+order: 1
+status: draft
+---
+
+# Screen: ユビキタス言語一覧画面
+
+## Purpose
+
+ユビキタス言語を一覧で見れる画面。
+
+## Fields
+
+- 用語名（一覧）
+- Definition / Notes / Related（詳細）
+
+## Actions
+
+- ユビキタス言語の追加（「+ 用語」）
+- ユビキタス言語の編集（詳細画面で編集 → 保存）
+- ユビキタス言語の削除
+
+## Errors
+
+-
+</script>
+
+<script type="text/plain" id="spec:features/domain-management/screens/S-002.md">
+---
+id: feature.domain-management.screen.S-002
+type: screen
+feature: domain-management
+order: 2
+status: draft
+---
+
+# Screen: モデル一覧画面
+
+## Purpose
+
+モデルが一覧で表示される
+
+## Fields
+
+- モデル名（一覧）
+- Description（詳細）
+- mermaid 図（詳細・preview 描画）
+
+## Actions
+
+- モデルの追加（「+ モデル」）
+- モデルの編集（詳細画面で編集 → 保存）
+- モデルの削除
+
+## Errors
+
+-
+</script>
+
+<script type="text/plain" id="spec:features/specs-management/spec.md">
+---
+id: feature.specs-management
+type: feature
+status: draft
+related:
+  - domain.glossary
+  - domain.models
+---
+
+# Feature: Specs Management
+
+## Overview
+
+仕様書を管理する。仕様書とはfeature配下のmdを差す。
+ローカルファーストな思想に基づき、`specs serve` で起動するローカルWeb UIから
+仕様書の一覧・詳細・作成・更新・削除・並び替えを行う。
+
+## Users
+
+エンジニア
+
+## Scope
+
+### Included
+
+- 仕様書の一覧閲覧
+- 仕様書の新規作成
+- 仕様書の削除
+- 仕様書の詳細閲覧
+- 仕様書の更新
+- 仕様書の並び変え
+
+- 画面（Screen）の管理（追加・並び替え・編集・削除）
+
+### Excluded
+
+- 認証・認可（ローカル実行のため不要）
+- 仕様書本体（spec.md / api.yaml）の任意単体追加（作成はfeature単位）
+- WYSIWYGエディタ（編集はMarkdownテキストで行う）
+- DBによる管理（Markdownファイルを唯一の正とする）
+
+## Requirements
+
+### R-001 仕様書の対象範囲
+
+仕様書として扱うのは以下とする。
+
+- `features/<feature>/spec.md`（type: feature）
+- `features/<feature>/api.yaml`（type: api / OpenAPI 3.1）
+- `features/<feature>/screens/*.md`（type: screen）
+- `domain/glossary/*.md`（type: term）, `domain/models/*.md`（type: model）
+- `product/*.md`（type: product）— ビジョン / プリンシパル（[product feature](../product/spec.md) が管理）
+
+### R-002 ローカルWeb UIの起動
+
+`specs serve [--addr host:port]` でローカルHTTPサーバを起動する。
+デフォルトの待受は `127.0.0.1:8787`。
+specs/ が未初期化の場合はエラーを表示し、`specs init` を促す。
+
+### R-003 一覧の表示
+
+仕様書を feature 単位でグループ化して表示する。
+各項目は ファイル名・type（frontmatterのtype）を表示する。
+
+### R-004 詳細の表示
+
+仕様書を種別に応じて整形表示する。
+
+- Markdown（spec.md / screen / term）: frontmatter をメタ情報として区別し本文を描画
+- model: mermaid コードブロックを図として描画
+- api.yaml: OpenAPI として paths / operations / schemas を軽量ビューで表示
+
+### R-005 更新
+
+詳細画面で編集モードに切り替え、本文（Markdown / YAML テキスト）を上書き保存できる。
+api.yaml は保存前に **OpenAPI スキーマ検証**を行い、不正な場合はエラーを表示して保存しない。
+保存後は一覧のメタ情報（title など）も更新される。
+
+### R-006 新規作成
+
+- feature 作成: feature 名を入力すると `spec.md` / `api.yaml`（OpenAPI 3.1 雛形）を生成する。
+  CLI の `specs new feature <name>` と同一の生成ロジック・テンプレートを用いる。
+  feature 名に使えるのは英数字・`.`・`_`・`-` のみ。
+- 画面作成: feature を指定して画面を追加すると `screens/S-00n[-<slug>].md`
+  を生成する。番号 (S-00n) と order は既存画面の次の値を自動採番する。
+  CLI は `specs new screen <feature> <name>`。
+
+### R-007 削除
+
+仕様書ファイルを削除する。削除によって `screens/` や feature 配下が
+空になった場合は当該ディレクトリも削除する（`features/` 自体は残す）。
+
+### R-008 画面の並び替え
+
+一覧上のドラッグ&ドロップで同一 feature 内の画面の表示順を変更できる。
+並び順は各画面ファイルの frontmatter の `order` に永続化する。
+一覧は domain → feature 昇順 → feature 内は spec.md, api.yaml, その後 screen を
+order 昇順で表示する。
+
+### R-009 安全性
+
+ID（specs/ からの相対パス）はパストラバーサルを禁止し、
+管理対象ルート（`product/`, `features/`, `domain/glossary/`, `domain/models/`）配下かつ
+`.md` / `.yaml` で終わるパスのみを受け付ける。
+
+## Screens
+
+画面は `screens/` 配下に 1 画面 1 ファイル（type: screen）で管理する。
+
+- [S-001 仕様書一覧画面](screens/S-001.md)
+- [S-002 仕様書詳細画面](screens/S-002.md)
+</script>
+
+<script type="text/plain" id="spec:features/specs-management/api.yaml">
+openapi: 3.1.0
+info:
+  title: Specs Management API
+  version: 0.1.0
+  description: |
+    仕様書 (specs/ 配下の md / yaml) を管理する API。
+    `{id}` は specs/ からの相対パス (例: features/user-login/spec.md)。
+servers:
+  - url: /api
+paths:
+  /specs:
+    get:
+      summary: 仕様書一覧の取得
+      operationId: listSpecs
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  specs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Spec"
+  /specs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/SpecId"
+    get:
+      summary: 仕様書詳細の取得
+      operationId: getSpec
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  spec:
+                    $ref: "#/components/schemas/Spec"
+                  content:
+                    type: string
+        "404":
+          $ref: "#/components/responses/Error"
+    put:
+      summary: 仕様書の更新
+      description: api.yaml の場合は保存前に OpenAPI スキーマ検証を行う。
+      operationId: updateSpec
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+              required:
+                - content
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      summary: 仕様書の削除
+      operationId: deleteSpec
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "404":
+          $ref: "#/components/responses/Error"
+  /features:
+    post:
+      summary: feature の作成 (spec.md / api.yaml を生成)
+      operationId: createFeature
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+              required:
+                - name
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created:
+                    type: array
+                    items:
+                      type: string
+        "400":
+          $ref: "#/components/responses/Error"
+  /features/{feature}/screens:
+    parameters:
+      - $ref: "#/components/parameters/Feature"
+    post:
+      summary: 画面の作成 (screens/S-00n.md)
+      operationId: createScreen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+              required:
+                - name
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+  /features/{feature}/screens/order:
+    parameters:
+      - $ref: "#/components/parameters/Feature"
+    put:
+      summary: 画面の並び替え (frontmatter の order を更新)
+      operationId: reorderScreens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                order:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - order
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+components:
+  parameters:
+    SpecId:
+      name: id
+      in: path
+      required: true
+      description: specs/ からの相対パス
+      schema:
+        type: string
+    Feature:
+      name: feature
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Ok:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+    Error:
+      description: エラー
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Spec:
+      type: object
+      properties:
+        id:
+          type: string
+        feature:
+          type: string
+        file:
+          type: string
+        type:
+          type: string
+          enum: [feature, api, screen, term, model]
+        title:
+          type: string
+        status:
+          type: string
+        order:
+          type: integer
+      required:
+        - id
+        - file
+        - type
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+</script>
+
+<script type="text/plain" id="spec:features/specs-management/screens/S-001.md">
+---
+id: feature.specs-management.screen.S-001
+type: screen
+feature: specs-management
+order: 1
+status: draft
+---
+
+# Screen: 仕様書一覧画面
+
+## Purpose
+
+全仕様書を俯瞰し、目的の仕様書へ遷移する起点となる画面。
+
+## Fields
+
+- feature 名（グループ見出し）
+- ファイル名（spec.md / api.yaml）
+- 画面名（screens の各項目）
+- type バッジ（feature / api / screen）
+
+## Actions
+
+- 仕様書を選択して詳細画面へ遷移する
+- 「新規 feature」から feature を作成する
+- 「+ 画面」から画面を作成する
+- 画面をドラッグ&ドロップで並び替える
+
+## Errors
+
+- 一覧取得失敗時はトーストでメッセージを表示する
+- 仕様書が0件の場合は「仕様書がありません」を表示する
+</script>
+
+<script type="text/plain" id="spec:features/specs-management/screens/S-002.md">
+---
+id: feature.specs-management.screen.S-002
+type: screen
+feature: specs-management
+order: 2
+status: draft
+---
+
+# Screen: 仕様書詳細画面
+
+## Purpose
+
+選択した仕様書の内容を閲覧・編集する画面。
+
+## Fields
+
+- パンくず（features / feature名 / ファイル名）
+- frontmatter（メタ情報枠）
+- 本文（Markdown整形表示 / 編集時はテキストエリア）
+
+## Actions
+
+- 編集 → 保存 / キャンセル
+- 削除（確認ダイアログ後に実行）
+
+## Errors
+
+- 取得・保存・削除の失敗時はトーストでメッセージを表示する
+- 存在しない仕様書を開いた場合はエラーメッセージを表示する
+</script>
+
+<!-- ============================================================
+     Libraries
+     ============================================================ -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+
+<!-- ============================================================
+     App
+     ============================================================ -->
+<script src="data.js"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="lib.jsx"></script>
+<script type="text/babel" src="openapi.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>

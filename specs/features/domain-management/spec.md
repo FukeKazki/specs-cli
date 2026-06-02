@@ -7,53 +7,50 @@ related:
   - domain.models
 ---
 
-# Feature: Domain Management
+# 機能: Domain Management
 
-## Overview
+## 概要
 
 ドメインを管理する
 
-## Users
+## ユーザー
 
 PM、エンジニア
 
-## Scope
+## スコープ
 
-### Included
+### 含む
 
 - ユビキタス言語の管理
 - モデルの管理
 
-### Excluded
+### 含まない
 
 -
 
 ## Requirements
 
-### R-001 [Must] モデルの表示
+要件は `requirements/` 配下に 1 要件 1 ファイル（type: requirement）で管理する。
 
-モデルはmermaidの記法で書く。表示もmermaidのpreviewで表示されるようにする。
+:::requirement{id=R-001 priority=must}
+[モデルの表示](requirements/R-001.md)
+:::
 
-### R-002 [Must] データ構造
+:::requirement{id=R-002 priority=must}
+[データ構造](requirements/R-002.md)
+:::
 
-ユビキタス言語は `domain/glossary/<term>.md` (type: term)、
-モデルは `domain/models/<model>.md` (type: model) として 1 件 1 ファイルで管理する。
-名前に日本語を許可し、パス区切り (`/` `\`) や `.` 始まりの名前は禁止する。
+:::requirement{id=R-003 priority=should}
+[ユビキタス言語の管理](requirements/R-003.md)
+:::
 
-### R-003 [Should] ユビキタス言語の管理
-
-一覧・詳細・追加・編集・削除ができる。
-追加は CLI `specs new term <name>`、または Web UI の「+ 用語」から。
-
-### R-004 [Should] モデルの管理
-
-一覧・詳細・追加・編集・削除ができる。
-追加は CLI `specs new model <name>`、または Web UI の「+ モデル」から。
-モデルファイルは説明 + mermaid コードブロックを持ち、詳細画面で mermaid を描画する。
+:::requirement{id=R-004 priority=should}
+[モデルの管理](requirements/R-004.md)
+:::
 
 ## Screens
 
 画面は `screens/` 配下に 1 画面 1 ファイル（type: screen）で管理する。
 
-- [S-001 ユビキタス言語一覧画面](screens/S-001.md)
-- [S-002 モデル一覧画面](screens/S-002.md)
+::screen-ref[S-001 ユビキタス言語一覧画面]{to=screens/S-001.md}
+::screen-ref[S-002 モデル一覧画面]{to=screens/S-002.md}

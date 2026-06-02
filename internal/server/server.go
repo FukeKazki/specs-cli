@@ -58,6 +58,40 @@ func Handler(st *store.Store) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 
+	// PATCH は frontmatter の進捗メタ部分更新 (PUT の全文置換と区別する)。
+	mux.HandleFunc("PATCH /api/specs/{id...}", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Status    *string   `json:"status"`
+			Assignee  *string   `json:"assignee"`
+			Start     *string   `json:"start"`
+			Due       *string   `json:"due"`
+			DependsOn *[]string `json:"dependsOn"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeErr(w, http.StatusBadRequest, err)
+			return
+		}
+		id := r.PathValue("id")
+		meta := store.Meta{
+			Status:    body.Status,
+			Assignee:  body.Assignee,
+			Start:     body.Start,
+			Due:       body.Due,
+			DependsOn: body.DependsOn,
+		}
+		if err := st.SetMeta(id, meta); err != nil {
+			writeStoreErr(w, err)
+			return
+		}
+		// 書込後の正規 Spec を返し、クライアントの楽観更新を確定値に整合させる。
+		sp, _, err := st.Get(id)
+		if err != nil {
+			writeStoreErr(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"spec": sp})
+	})
+
 	mux.HandleFunc("DELETE /api/specs/{id...}", func(w http.ResponseWriter, r *http.Request) {
 		if err := st.Delete(r.PathValue("id")); err != nil {
 			writeStoreErr(w, err)
@@ -91,6 +125,22 @@ func Handler(st *store.Store) http.Handler {
 			return
 		}
 		id, err := st.CreateScreen(r.PathValue("feature"), body.Name)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"created": id})
+	})
+
+	mux.HandleFunc("POST /api/features/{feature}/requirements", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeErr(w, http.StatusBadRequest, err)
+			return
+		}
+		id, err := st.CreateRequirement(r.PathValue("feature"), body.Name)
 		if err != nil {
 			writeErr(w, http.StatusBadRequest, err)
 			return

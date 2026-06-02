@@ -1,4 +1,4 @@
-import type { Spec, SpecDetail } from "./types";
+import type { Spec, SpecDetail, SpecMeta } from "./types";
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
   const opt: RequestInit = { method, headers: {} };
@@ -16,10 +16,13 @@ export const api = {
   list: () => req<{ specs: Spec[] }>("GET", "/api/specs").then((d) => d.specs ?? []),
   get: (id: string) => req<SpecDetail>("GET", `/api/specs/${id}`),
   update: (id: string, content: string) => req<{ ok: boolean }>("PUT", `/api/specs/${id}`, { content }),
+  setMeta: (id: string, meta: SpecMeta) => req<{ spec: Spec }>("PATCH", `/api/specs/${id}`, meta),
   remove: (id: string) => req<{ ok: boolean }>("DELETE", `/api/specs/${id}`),
   createFeature: (name: string) => req<{ created: string[] }>("POST", "/api/features", { name }),
   createScreen: (feature: string, name: string) =>
     req<{ created: string }>("POST", `/api/features/${encodeURIComponent(feature)}/screens`, { name }),
+  createRequirement: (feature: string, name: string) =>
+    req<{ created: string }>("POST", `/api/features/${encodeURIComponent(feature)}/requirements`, { name }),
   reorderScreens: (feature: string, order: string[]) =>
     req<{ ok: boolean }>("PUT", `/api/features/${encodeURIComponent(feature)}/screens/order`, { order }),
   createTerm: (name: string) => req<{ created: string }>("POST", "/api/domain/terms", { name }),

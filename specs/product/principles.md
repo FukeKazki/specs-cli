@@ -4,9 +4,9 @@ type: product
 status: draft
 ---
 
-# Product Principles
+# プロダクト原則
 
-## Principle 1
+## 原則 1
 
 シンプルなツールに
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./ui";
 
-export type CreateKind = "feature" | "screen" | "term" | "model";
+export type CreateKind = "feature" | "screen" | "requirement" | "term" | "model";
 
 export interface ModalState {
   kind: CreateKind;
@@ -11,13 +11,18 @@ export interface ModalState {
 const CREATE_COPY: Record<CreateKind, { title: string; hint: string; placeholder: string }> = {
   feature: {
     title: "新規 feature",
-    hint: "英数字 . _ - が使えます。spec.md と api.yaml が生成されます。",
+    hint: "英数字 . _ - が使えます。spec.md が生成されます。",
     placeholder: "feature 名 (例: user-login)",
   },
   screen: {
     title: "画面を追加",
     hint: "画面名を入力。S-00n が自動採番され screens/ に生成されます。",
     placeholder: "画面名 (例: ログイン画面)",
+  },
+  requirement: {
+    title: "要件を追加",
+    hint: "要件名を入力。R-00n が自動採番され requirements/ に生成されます。",
+    placeholder: "要件名 (例: ステータス管理)",
   },
   term: {
     title: "用語を追加",
@@ -53,7 +58,10 @@ export function Modal({ modal, onSubmit, onClose }: ModalProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const title = modal.kind === "screen" && modal.feature ? `${copy.title} — ${modal.feature}` : copy.title;
+  const title =
+    (modal.kind === "screen" || modal.kind === "requirement") && modal.feature
+      ? `${copy.title} — ${modal.feature}`
+      : copy.title;
   const submit = () => {
     const v = name.trim();
     if (v) onSubmit(v);
@@ -64,9 +72,11 @@ export function Modal({ modal, onSubmit, onClose }: ModalProps) {
     const n = name.trim() || "…";
     switch (modal.kind) {
       case "feature":
-        return [`features/${n}/spec.md`, `features/${n}/api.yaml`];
+        return [`features/${n}/spec.md`];
       case "screen":
         return [`features/${modal.feature}/screens/S-00n.md`];
+      case "requirement":
+        return [`features/${modal.feature}/requirements/R-00n.md`];
       case "term":
         return [`domain/glossary/${n}.md`];
       case "model":

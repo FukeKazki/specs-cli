@@ -7,7 +7,7 @@ import (
 	"text/template"
 )
 
-//go:embed files/*.md files/*.md.tmpl files/*.yaml.tmpl
+//go:embed files/*.md files/*.md.tmpl
 var files embed.FS
 
 // FeatureData holds the values substituted into feature templates.
@@ -22,6 +22,15 @@ type ScreenData struct {
 	Num     string // 画面番号 (例: S-001)
 	Title   string // 見出しに使う表示名
 	Order   int    // 並び順
+}
+
+// RequirementData holds the values substituted into the requirement template.
+type RequirementData struct {
+	Feature  string // 所属する feature 名
+	Num      string // 要件番号 (例: R-001)
+	Title    string // 見出しに使う表示名
+	Order    int    // 並び順
+	Priority string // MoSCoW 優先度 (Must / Should / Could / Won't)
 }
 
 // Static returns the raw bytes of an embedded static template (init で生成するファイル).

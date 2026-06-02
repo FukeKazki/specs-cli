@@ -13,13 +13,13 @@ status: draft
 
 - `id`: specs/ からの相対パス。一意キー（例: `features/user-login/spec.md`）
 - `feature`: 所属する feature 名（domain エントリでは空）
-- `file`: ファイル名（spec.md / api.yaml / S-00n.md / 用語名.md など）
-- `type`: 種別。`feature` / `api` / `screen` / `term` / `model`
+- `file`: ファイル名（spec.md / R-00n.md / S-00n.md / 用語名.md など）
+- `type`: 種別。`feature` / `requirement` / `screen` / `term` / `model`
 - `title`: 先頭の H1 見出し
 - `status`: frontmatter の status（draft など）
-- `order`: 並び順（screen で使用）
+- `order`: 並び順（requirement / screen で使用）
 
-関連: [Feature](Feature.md)（spec.md / api.yaml / screens を束ねる）、[Screen](Screen.md)（type=screen の特化）。
+関連: [Feature](Feature.md)（spec.md / requirements / screens を束ねる）、[Screen](Screen.md)（type=screen の特化）。
 
 ## Diagram
 
@@ -38,7 +38,7 @@ classDiagram
     class SpecType {
         <<enumeration>>
         feature
-        api
+        requirement
         screen
         term
         model

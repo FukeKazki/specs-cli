@@ -1,7 +1,9 @@
 import { Children, useMemo, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkDirective from "remark-directive";
 import { Mermaid } from "./Mermaid";
+import { directiveToComponents } from "../lib/remarkDirective";
 import { lineOffset, parseFront } from "../lib/frontmatter";
 
 // MoSCoW 優先度 (specs-management R-010)。要件見出しの [Must] 等を色分けバッジにする。
@@ -38,15 +40,43 @@ function preprocess(md: string): string {
   );
 }
 
+// hast ノードからテキストを連結して取り出す (タスク項目のラベル抽出用)。
+function hastText(node: unknown): string {
+  const n = node as { type?: string; value?: string; children?: unknown[] } | undefined;
+  if (!n) return "";
+  if (n.type === "text") return n.value ?? "";
+  if (Array.isArray(n.children)) return n.children.map(hastText).join("");
+  return "";
+}
+
+// タスク項目 (li.task-list-item) のチェック状態を hast から読む。
+function taskChecked(node: unknown): boolean {
+  const n = node as { children?: { tagName?: string; properties?: { checked?: boolean } }[] } | undefined;
+  const input = n?.children?.find((c) => c?.tagName === "input");
+  return !!input?.properties?.checked;
+}
+
+// directive 系コンポーネントが受け取る props。属性 (id/type/…) は文字列で渡る。
+interface DirectiveProps {
+  id?: string;
+  priority?: string;
+  type?: string;
+  title?: string;
+  to?: string;
+  children?: ReactNode;
+}
+
 export interface MarkdownProps {
   content: string;
   theme: string;
   // AI 参照コピー用 (R-011)。path は specs/ からのフルパス (例: specs/features/x/spec.md)。
   path?: string;
   onCopyRef?: (ref: string) => void;
+  // タスクリストのチェック切り替え (Screen Actions の実装状況, dashbaord)。
+  onToggleTask?: (label: string, checked: boolean) => void;
 }
 
-export function Markdown({ content, theme, path, onCopyRef }: MarkdownProps) {
+export function Markdown({ content, theme, path, onCopyRef, onToggleTask }: MarkdownProps) {
   // frontmatter は本文に出さない (右情報レールへ集約) が、行番号オフセットは保持する。
   const { body } = parseFront(content);
   const offset = lineOffset(content, body);
@@ -105,6 +135,29 @@ export function Markdown({ content, theme, path, onCopyRef }: MarkdownProps) {
           </code>
         );
       },
+      // タスクリスト項目: チェックボックスをクリック可能にして切り替えを通知する。
+      li({ node, children, className }) {
+        const isTask = typeof className === "string" && className.includes("task-list-item");
+        if (!isTask || !onToggleTask) {
+          return <li className={className}>{children}</li>;
+        }
+        const checked = taskChecked(node);
+        const label = hastText(node).trim();
+        // react-markdown が生成する元の disabled チェックボックスは除き、独自のものを描く。
+        const rest = Children.toArray(children).filter(
+          (c) => !(c != null && typeof c === "object" && "type" in c && (c as { type?: unknown }).type === "input"),
+        );
+        return (
+          <li className={className + " md-task"}>
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={() => onToggleTask(label, !checked)}
+            />
+            <span>{rest}</span>
+          </li>
+        );
+      },
       // mermaid 図は pre で囲わない、通常のコードブロックは pre を維持する。
       pre({ children }) {
         if (
@@ -116,12 +169,60 @@ export function Markdown({ content, theme, path, onCopyRef }: MarkdownProps) {
         }
         return <pre>{children}</pre>;
       },
-    };
-  }, [path, offset, onCopyRef, theme]);
+      // :::requirement{id=R-001 priority=must} 本文 ::: → 要件カード。
+      // priority は見出しバッジと同じ MoSCoW 配色 (prio-*) を流用する。
+      "directive-requirement": ({ id, priority, children }: DirectiveProps) => {
+        const info = priority ? PRIORITY[priority.toLowerCase()] : null;
+        return (
+          <div className="dir-req">
+            <div className="dir-req-head">
+              {id && <span className="dir-req-id mono">{id}</span>}
+              {info && <span className={`prio ${info.cls}`}>{info.label}</span>}
+            </div>
+            <div className="dir-req-body">{children}</div>
+          </div>
+        );
+      },
+      // :::note{type=warn|info|tip} 本文 ::: → 注記ボックス (既定 info)。
+      "directive-note": ({ type, children }: DirectiveProps) => {
+        const kind = type && ["info", "warn", "tip"].includes(type) ? type : "info";
+        return (
+          <aside className={`dir-note dir-note-${kind}`}>
+            <div className="dir-note-body">{children}</div>
+          </aside>
+        );
+      },
+      // :::acceptance{title=…} 本文 ::: → 受け入れ条件ボックス。
+      // 中のタスクリストは既存の li オーバーライド (onToggleTask) がそのまま効く。
+      "directive-acceptance": ({ title, children }: DirectiveProps) => (
+        <section className="dir-accept">
+          <div className="dir-accept-head">{title || "受け入れ条件"}</div>
+          <div className="dir-accept-body">{children}</div>
+        </section>
+      ),
+      // :badge[ラベル]{type=…} → インラインバッジ。
+      "directive-badge": ({ type, children }: DirectiveProps) => (
+        <span className={`dir-badge dir-badge-${type || "default"}`}>{children}</span>
+      ),
+      // ::screen-ref[ラベル]{to=screens/S-001-login.md} → 画面への相互リンク。
+      // 行頭のリーフ (::) はブロック、行内では :screen-ref[…]{…} (テキスト) を使う。
+      // 相対 href として描き、Detail の onDocClick が SPA 遷移へ解決する。
+      "directive-screen-ref": ({ to, children }: DirectiveProps) => {
+        const nodes = Children.toArray(children);
+        const label = nodes.length ? children : (to ?? "").split("/").pop();
+        return (
+          <a className="dir-screen-ref" href={to || "#"}>
+            <span className="dir-screen-ref-ico">▤</span>
+            {label}
+          </a>
+        );
+      },
+    } as Components;
+  }, [path, offset, onCopyRef, theme, onToggleTask]);
 
   return (
     <div className="md">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkDirective, directiveToComponents]} components={components}>
         {source}
       </ReactMarkdown>
     </div>

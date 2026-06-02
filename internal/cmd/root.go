@@ -13,6 +13,7 @@ Usage:
   specs init                  specs/ ディレクトリとテンプレートを生成する
   specs new feature <name>    features/<name>/ に spec.md / api.md を生成する
   specs new screen <feature> <name>  feature に画面 (screens/S-00n.md) を追加する
+  specs new requirement <feature> <title>  feature に要件 (requirements/R-00n.md) を追加する
   specs new term <name>       domain/glossary/ にユビキタス言語を追加する
   specs new model <name>      domain/models/ にモデル (mermaid) を追加する
   specs serve [--addr host:port]  仕様書管理 Web UI を起動する

@@ -22,6 +22,12 @@ const ICON: Record<string, string> = {
   link: "M8 11a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-1 1M12 9a3 3 0 0 0-4.2 0l-2 2A3 3 0 0 0 10 15.2l1-1",
   cube: "M10 3l6 3.4v6.9L10 17l-6-3.7V6.4L10 3ZM4 6.5l6 3.5 6-3.5M10 10v7",
   hash: "M7 3l-1 14M14 3l-1 14M4 7.5h12M3.5 12.5h12",
+  board: "M3.5 4.5h13v11h-13zM8 4.5v11M12.5 4.5v11",
+  list: "M6.5 5.5h10M6.5 10h10M6.5 14.5h10M3.5 5.5h.01M3.5 10h.01M3.5 14.5h.01",
+  gantt: "M4 5.5h7M4 10h10M4 14.5h5",
+  calendar: "M4.5 5h11v11h-11zM4.5 8.5h11M7.5 3.5v3M12.5 3.5v3",
+  user: "M10 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM4.5 16a5.5 5.5 0 0 1 11 0",
+  circle: "M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z",
 };
 
 export interface IconProps {
@@ -56,18 +62,34 @@ export function Icon({ name, size = 18, stroke = 1.6, style, className }: IconPr
 export const TYPE_LABEL: Record<string, string> = {
   product: "プロダクト",
   feature: "機能",
-  api: "API",
   screen: "画面",
+  requirement: "要件",
   term: "用語",
   model: "モデル",
 };
 
 export const STATUS_LABEL: Record<string, string> = {
   draft: "下書き",
+  "in-progress": "進行中",
   review: "レビュー中",
   done: "確定",
 };
 
+// status の標準値 (frontmatter)。詳細画面のステータス変更セレクト等で使う。
+export const STATUS_OPTIONS = ["draft", "in-progress", "review", "done"];
+
 export function Badge({ type }: { type: string }) {
   return <span className={"badge " + type}>{TYPE_LABEL[type] ?? type}</span>;
+}
+
+// MoSCoW 優先度タグ (Must=赤 / Should=橙 / Could=青 / Won't=灰)。
+const PRIORITY_CLASS: Record<string, string> = {
+  Must: "must",
+  Should: "should",
+  Could: "could",
+  "Won't": "wont",
+};
+
+export function PriorityTag({ priority }: { priority: string }) {
+  return <span className={"prio-tag " + (PRIORITY_CLASS[priority] ?? "")}>{priority}</span>;
 }

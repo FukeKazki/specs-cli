@@ -4,13 +4,13 @@ type: product
 status: draft
 ---
 
-# Vision
+# ビジョン
 
 ## Background
 
 <!-- なぜこのプロダクトが必要か -->
 
-## Purpose
+## 目的
 
 <!-- 何を実現するか -->
 

@@ -1,6 +1,7 @@
 import type { Spec } from "../types";
 import type { Front } from "../lib/frontmatter";
-import { Badge, Icon, STATUS_LABEL } from "./ui";
+import { parseActions } from "../lib/actions";
+import { Badge, Icon, STATUS_LABEL, STATUS_OPTIONS } from "./ui";
 
 export interface InfoPanelProps {
   selected: Spec;
@@ -8,6 +9,8 @@ export interface InfoPanelProps {
   body: string;
   open: boolean;
   onRelated: (ref: string) => void;
+  onStatusChange: (status: string) => void;
+  onAddAction: () => void;
 }
 
 function screenNumber(s: Spec): string {
@@ -15,12 +18,16 @@ function screenNumber(s: Spec): string {
   return m ? m[1] : s.file.replace(/\.md$/, "");
 }
 
-export function InfoPanel({ selected, front, body, open, onRelated }: InfoPanelProps) {
+export function InfoPanel({ selected, front, body, open, onRelated, onStatusChange, onAddAction }: InfoPanelProps) {
   // 本文の H2/H3 から目次を組み立てる。
   const toc: { level: number; text: string }[] = [];
   const re = /^(##|###)\s+(.+)$/gm;
   let m: RegExpExecArray | null;
   while ((m = re.exec(body))) toc.push({ level: m[1].length, text: m[2].trim() });
+
+  // Screen の Actions 実装状況 (チェックリスト集計, dashbaord)。
+  const actions = selected.type === "screen" ? parseActions(body) : [];
+  const doneCount = actions.filter((a) => a.done).length;
 
   const related = Array.isArray(front.related) ? front.related : [];
   const status = (typeof front.status === "string" && front.status) || selected.status;
@@ -48,15 +55,24 @@ export function InfoPanel({ selected, front, body, open, onRelated }: InfoPanelP
 
         <div className="info-block">
           <div className="info-label">種別</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Badge type={selected.type} />
-            {status && (
-              <span className="status-pill">
-                <span className="dot" />
-                {STATUS_LABEL[status] || status}
-              </span>
-            )}
-          </div>
+          <Badge type={selected.type} />
+        </div>
+
+        {/* status は frontmatter に保存できる (S-002: サイドバーで変更)。 */}
+        <div className="info-block">
+          <div className="info-label">ステータス</div>
+          <select
+            className="info-status"
+            value={status || ""}
+            onChange={(e) => onStatusChange(e.target.value)}
+          >
+            <option value="">未設定</option>
+            {[...STATUS_OPTIONS, ...(status && !STATUS_OPTIONS.includes(status) ? [status] : [])].map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABEL[s] || s}
+              </option>
+            ))}
+          </select>
         </div>
 
         {selected.type === "screen" && (
@@ -67,6 +83,41 @@ export function InfoPanel({ selected, front, body, open, onRelated }: InfoPanelP
                 {screenNumber(selected)} · 表示順 {selected.order}
               </span>
             </div>
+          </div>
+        )}
+
+        {selected.type === "screen" && (
+          <div className="info-block">
+            <div className="info-label info-label-row">
+              <span>操作</span>
+              <button className="info-add" title="操作を追加" onClick={onAddAction}>
+                <Icon name="plus" size={13} stroke={2} />
+              </button>
+            </div>
+            {actions.length > 0 ? (
+              <div className="action-progress">
+                <div className="action-progress-head">
+                  <span>
+                    {doneCount} / {actions.length} 完了
+                  </span>
+                  <span className="pct mono">{Math.round((doneCount / actions.length) * 100)}%</span>
+                </div>
+                <div className="action-bar">
+                  <div className="action-bar-fill" style={{ width: `${(doneCount / actions.length) * 100}%` }} />
+                </div>
+                <ul className="action-list">
+                  {actions.map((a, i) => (
+                    <li key={i} className={a.done ? "done" : ""}>
+                      <Icon name={a.done ? "check" : "circle"} size={13} />
+                      {a.id && <span className="aid mono">{a.id}</span>}
+                      <span className="atext">{a.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="action-empty">操作がありません</div>
+            )}
           </div>
         )}
 

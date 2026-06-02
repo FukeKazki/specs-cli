@@ -17,12 +17,14 @@ func runNew(args []string) error {
 		return runNewFeature(args[1:])
 	case "screen":
 		return runNewScreen(args[1:])
+	case "requirement":
+		return runNewRequirement(args[1:])
 	case "term":
 		return runNewDomain(args[1:], "term", func(st *store.Store, name string) (string, error) { return st.CreateTerm(name) })
 	case "model":
 		return runNewDomain(args[1:], "model", func(st *store.Store, name string) (string, error) { return st.CreateModel(name) })
 	default:
-		return fmt.Errorf("unknown new target %q (supported: feature, screen, term, model)", args[0])
+		return fmt.Errorf("unknown new target %q (supported: feature, screen, requirement, term, model)", args[0])
 	}
 }
 
@@ -72,6 +74,23 @@ func runNewScreen(args []string) error {
 		return err
 	}
 	id, err := st.CreateScreen(args[0], args[1])
+	if err != nil {
+		return err
+	}
+	fmt.Printf("created %s\n", filepath.Join(store.Root, filepath.FromSlash(id)))
+	return nil
+}
+
+// runNewRequirement creates specs/features/<feature>/requirements/R-00n.md.
+func runNewRequirement(args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("usage: specs new requirement <feature> <title>")
+	}
+	st := store.New(".")
+	if err := st.EnsureInitialized(); err != nil {
+		return err
+	}
+	id, err := st.CreateRequirement(args[0], args[1])
 	if err != nil {
 		return err
 	}

@@ -1,8 +1,19 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Spec } from "../types";
 import { Badge, Icon } from "./ui";
 
 const IND = 13; // px per nesting level
+
+// 選択中アイテムを表示するために開く必要のあるディスクロージャのキー一覧 (dashbaord S-001 L26)。
+function ancestorKeys(s: Spec): string[] {
+  if (s.id.startsWith("product/")) return ["g:product"];
+  if (s.type === "term") return ["g:domain", "sub:terms"];
+  if (s.type === "model") return ["g:domain", "sub:models"];
+  const keys = ["g:features", "feat:" + s.feature];
+  if (s.type === "requirement") keys.push("reqs:" + s.feature);
+  if (s.type === "screen") keys.push("screens:" + s.feature);
+  return keys;
+}
 
 export interface SidebarProps {
   specs: Spec[];
@@ -11,6 +22,7 @@ export interface SidebarProps {
   onSelect: (id: string) => void;
   onAddFeature: () => void;
   onAddScreen: (feature: string) => void;
+  onAddRequirement: (feature: string) => void;
   onAddTerm: () => void;
   onAddModel: () => void;
   onReorderScreens: (feature: string, orderedIds: string[]) => void;
@@ -28,7 +40,7 @@ function sortProduct(a: Spec, b: Spec): number {
   return rank(a) - rank(b) || a.file.localeCompare(b.file);
 }
 function screenNumber(s: Spec): string {
-  const m = s.file.match(/^(S-\d+)/);
+  const m = s.file.match(/^(S-\d+|R-\d+)/);
   return m ? m[1] : s.file.replace(/\.md$/, "");
 }
 
@@ -41,6 +53,7 @@ function Disclosure({
   addTitle,
   group,
   feature,
+  active,
   mono,
   icon,
   children,
@@ -53,6 +66,7 @@ function Disclosure({
   addTitle?: string;
   group?: boolean;
   feature?: boolean;
+  active?: boolean;
   mono?: boolean;
   icon?: string;
   children: ReactNode;
@@ -60,7 +74,7 @@ function Disclosure({
   return (
     <div className={"disc" + (group ? " disc-group" : "") + (feature ? " disc-feature" : "")}>
       <div
-        className={"disc-head" + (open ? "" : " collapsed")}
+        className={"disc-head" + (open ? "" : " collapsed") + (active ? " active" : "")}
         style={{ paddingLeft: 8 + depth * IND }}
         onClick={onToggle}
       >
@@ -99,15 +113,42 @@ export function Sidebar({
   onSelect,
   onAddFeature,
   onAddScreen,
+  onAddRequirement,
   onAddTerm,
   onAddModel,
   onReorderScreens,
 }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // デフォルトは全て閉じる (dashbaord S-001 L25)。expanded[k] が true のものだけ開く。
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [drag, setDrag] = useState<{ id: string | null; over: string | null }>({ id: null, over: null });
 
-  const isOpen = (k: string) => !collapsed[k];
-  const toggle = (k: string) => setCollapsed((c) => ({ ...c, [k]: !c[k] }));
+  const isOpen = (k: string) => !!expanded[k];
+  const toggle = (k: string) => setExpanded((o) => ({ ...o, [k]: !o[k] }));
+
+  // 選択中アイテムが属する feature (機能名ハイライト用, dashbaord R-001)。
+  const activeSpec = specs.find((s) => s.id === activeId);
+  const activeFeature = activeSpec?.feature || "";
+
+  // 選択中アイテムの祖先を自動展開する (dashbaord S-001 L26)。
+  useEffect(() => {
+    if (!activeSpec) return;
+    const keys = ancestorKeys(activeSpec);
+    setExpanded((o) => {
+      if (keys.every((k) => o[k])) return o;
+      const next = { ...o };
+      for (const k of keys) next[k] = true;
+      return next;
+    });
+  }, [activeSpec]);
+
+  // 展開後、選択中の行をスクロール表示する (スクロール追従, dashbaord S-001 L26)。
+  useEffect(() => {
+    if (!activeId) return;
+    const t = setTimeout(() => {
+      document.querySelector(".sidebar .row.active")?.scrollIntoView({ block: "nearest" });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [activeId, expanded]);
 
   const products = specs.filter(isProduct).sort(sortProduct);
   const terms = specs.filter((s) => s.type === "term");
@@ -188,7 +229,7 @@ export function Sidebar({
         </span>
       )}
       <span className="rlabel">
-        {s.type === "screen" && <span className="rnum mono">{screenNumber(s)}</span>}
+        {(s.type === "screen" || s.type === "requirement") && <span className="rnum mono">{screenNumber(s)}</span>}
         {label}
         {fileHint && <span className="rfile mono">{fileHint}</span>}
       </span>
@@ -265,7 +306,9 @@ export function Sidebar({
         >
           {features.map((f) => {
             const spec = specs.find((s) => s.feature === f && s.type === "feature");
-            const api = specs.find((s) => s.feature === f && s.type === "api");
+            const requirements = specs
+              .filter((s) => s.feature === f && s.type === "requirement")
+              .sort((a, b) => a.order - b.order);
             const screens = specs
               .filter((s) => s.feature === f && s.type === "screen")
               .sort((a, b) => a.order - b.order);
@@ -277,12 +320,30 @@ export function Sidebar({
                 mono
                 icon="cube"
                 feature
+                active={f === activeFeature}
                 depth={1}
                 open={isOpen(fk)}
                 onToggle={() => toggle(fk)}
               >
                 {spec && <Row s={spec} label="機能仕様" fileHint="spec.md" depth={2} />}
-                {api && <Row s={api} label="API 仕様" fileHint="api.yaml" depth={2} />}
+                <Disclosure
+                  label="要件"
+                  depth={2}
+                  open={isOpen("reqs:" + f)}
+                  onToggle={() => toggle("reqs:" + f)}
+                  onAdd={() => onAddRequirement(f)}
+                  addTitle="要件を追加"
+                >
+                  {requirements.length ? (
+                    requirements.map((s) => (
+                      <Row key={s.id} s={s} label={s.title.replace(/^R-\d+\s*/, "")} depth={3} />
+                    ))
+                  ) : (
+                    <div className="row empty-row" style={{ paddingLeft: 9 + 3 * IND }}>
+                      要件がありません
+                    </div>
+                  )}
+                </Disclosure>
                 <Disclosure
                   label="画面"
                   depth={2}

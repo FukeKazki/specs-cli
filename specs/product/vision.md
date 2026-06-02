@@ -4,13 +4,13 @@ type: product
 status: draft
 ---
 
-# Vision
+# ビジョン
 
 ## Background
 
 AI時代の仕様書管理をアップデートしたい。
 
-## Purpose
+## 目的
 
 ローカルファーストな仕様書管理CLI。
 CLI経由での作成・更新が可能。

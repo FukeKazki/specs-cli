@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { parse } from "yaml";
 import { api } from "../api";
 import type { Spec, SpecDetail } from "../types";
 import { parseFront, dottedToPath } from "../lib/frontmatter";
+import { isActionsHeading } from "../lib/actions";
 import { Icon } from "./ui";
 import { Markdown } from "./Markdown";
-import { OpenApiView } from "./OpenApiView";
 import { InfoPanel } from "./InfoPanel";
 
 export interface DetailProps {
@@ -19,19 +18,6 @@ export interface DetailProps {
   onDeleted: () => void;
   onError: (message: string) => void;
   onToast: (message: string, sub?: string) => void;
-}
-
-// api.yaml の OpenAPI 検証 (保存前)。問題があればエラーメッセージを返す。
-function validateOpenApi(text: string): string | null {
-  try {
-    const doc = parse(text) as { openapi?: unknown; info?: { title?: unknown }; paths?: unknown };
-    if (!doc || !doc.openapi) return "`openapi` フィールドが必要です (OpenAPI 3.x)。";
-    if (!doc.info || !doc.info.title) return "`info.title` が必要です。";
-    if (typeof doc.paths !== "object" || doc.paths === null) return "`paths` オブジェクトが必要です。";
-    return null;
-  } catch (e) {
-    return (e as Error).message;
-  }
 }
 
 export function Detail({
@@ -129,14 +115,6 @@ export function Detail({
 
   const save = async () => {
     if (!detail) return;
-    if (detail.spec.type === "api") {
-      const err = validateOpenApi(draft);
-      if (err) {
-        setEditErr("OpenAPI 検証エラー\n" + err);
-        onError("検証エラー: 保存しませんでした");
-        return;
-      }
-    }
     setSaving(true);
     try {
       await api.update(id, draft);
@@ -149,6 +127,90 @@ export function Detail({
       onError((e as Error).message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Actions のチェックボックス切り替えを本文に反映して保存する (Screen 実装状況)。
+  // ラベル先頭の A-00n があれば ID で、無ければテキストで対象行を特定する。
+  const toggleTask = async (label: string, checked: boolean) => {
+    if (!detail) return;
+    const idMatch = label.match(/\bA-\d+\b/);
+    const lines = detail.content.split("\n");
+    const idx = lines.findIndex((l) => {
+      if (!/^\s*-\s*\[[ xX]\]/.test(l)) return false;
+      const rest = l.replace(/^\s*-\s*\[[ xX]\]\s*/, "").trim();
+      return idMatch ? rest.includes(idMatch[0]) : rest === label.trim();
+    });
+    if (idx < 0) return;
+    lines[idx] = lines[idx].replace(/\[[ xX]\]/, checked ? "[x]" : "[ ]");
+    const next = lines.join("\n");
+    try {
+      await api.update(id, next);
+      setDetail({ ...detail, content: next });
+      onSaved();
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  };
+
+  // 操作に新しい項目を A-00n 採番で追加し、編集モードへ遷移する (S-002 A-004)。
+  const addAction = () => {
+    if (!detail) return;
+    const lines = detail.content.split("\n");
+    const ai = lines.findIndex((l) => {
+      const m = l.match(/^#{1,6}\s+(.*)$/);
+      return m ? isActionsHeading(m[1]) : false;
+    });
+    const nums = [...detail.content.matchAll(/\bA-(\d+)\b/g)].map((m) => parseInt(m[1], 10));
+    const next = (nums.length ? Math.max(...nums) : 0) + 1;
+    const newLine = `- [ ] A-${String(next).padStart(3, "0")} `;
+
+    let insertAt: number;
+    if (ai < 0) {
+      // 操作セクションが無ければ末尾に新設する。
+      if (lines[lines.length - 1]?.trim() !== "") lines.push("");
+      lines.push("## 操作", "", newLine);
+      insertAt = lines.length - 1;
+    } else {
+      // セクション終端 (次の見出し or EOF) の手前 (末尾の空行を除く) に挿入する。
+      let end = lines.length;
+      for (let i = ai + 1; i < lines.length; i++) {
+        if (/^#{1,6}\s/.test(lines[i])) {
+          end = i;
+          break;
+        }
+      }
+      let pos = end;
+      while (pos > ai + 1 && lines[pos - 1].trim() === "") pos--;
+      lines.splice(pos, 0, newLine);
+      insertAt = pos;
+    }
+
+    const draftText = lines.join("\n");
+    setDraft(draftText);
+    setEditErr(null);
+    setEditing(true);
+    // 追加行の末尾へカーソルを移動する。
+    const caret = lines.slice(0, insertAt + 1).join("\n").length;
+    window.setTimeout(() => {
+      const ta = taRef.current;
+      if (!ta) return;
+      ta.focus();
+      ta.setSelectionRange(caret, caret);
+    }, 0);
+  };
+
+  // 右情報レールから status を変更し frontmatter に保存する (S-002)。
+  const changeStatus = async (status: string) => {
+    if (!detail) return;
+    try {
+      await api.setMeta(id, { status });
+      const fresh = await api.get(id);
+      setDetail(fresh);
+      onSaved();
+      onToast("ステータスを更新しました", `${id} → ${status || "未設定"}`);
+    } catch (e) {
+      onError((e as Error).message);
     }
   };
 
@@ -270,17 +332,27 @@ export function Detail({
             </div>
           ) : (
             <div className="doc" onClick={onDocClick}>
-              {spec?.type === "api" ? (
-                <OpenApiView content={detail.content} />
-              ) : (
-                <Markdown content={detail.content} theme={theme} path={`specs/${id}`} onCopyRef={copyRef} />
-              )}
+              <Markdown
+                content={detail.content}
+                theme={theme}
+                path={`specs/${id}`}
+                onCopyRef={copyRef}
+                onToggleTask={toggleTask}
+              />
             </div>
           )}
         </div>
 
         {!editing && spec && (
-          <InfoPanel selected={spec} front={front} body={body} open={infoOpen} onRelated={onRelated} />
+          <InfoPanel
+            selected={spec}
+            front={front}
+            body={body}
+            open={infoOpen}
+            onRelated={onRelated}
+            onStatusChange={changeStatus}
+            onAddAction={addAction}
+          />
         )}
       </div>
     </main>
